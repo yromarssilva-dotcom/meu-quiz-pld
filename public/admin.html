@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <title>Painel do Apresentador</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body style="padding-right: 250px;"> <!-- Espaço para não esconder sob a barra -->
+    <!-- Barra Lateral de Jogadores -->
+    <aside class="admin-sidebar" id="admin-sidebar">
+        <h3>Jogadores (<span id="user-count">0</span>)</h3>
+        <div id="user-list"></div>
+    </aside>
+
+    <div class="admin-container" id="question-container">
+        <div class="pin-display">
+            PIN do Jogo: <span id="sala-pin" style="letter-spacing: 4px;">----</span>
+        </div>
+        
+        <!-- QR Code Container -->
+        <div id="qr-section" style="display: flex; flex-direction: column; align-items: center; margin-bottom: 25px;">
+            <div id="qrcode" style="padding: 10px; background: white; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);"></div>
+            <p style="margin-top: 10px; font-size: 1.2rem; color: #FFD700; font-weight: bold; text-shadow: 1px 1px 2px #000;">Aponte a câmera para entrar!</p>
+        </div>
+
+        <div id="timer-display" class="timer-display" style="display: none;">--</div>
+        
+        <h1 id="pergunta" class="kahoot-question">Aguardando...</h1>
+        <div id="dica-admin" style="color: #FFD700; font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; text-shadow: 1px 1px 2px #000;"></div>
+        
+        <!-- Esconde a grade de alternativas até que o jogo comece -->
+        <div class="k-grid" id="opcoes-grid" style="display: none;">
+            <div class="k-card k-red" id="card-A">
+                <div class="k-icon"><i class="fa-solid fa-play fa-rotate-270"></i></div>
+                <span class="k-text" id="texto-A">Opção A</span>
+                <span class="k-votes" id="votosA">0</span>
+            </div>
+            <div class="k-card k-blue" id="card-B">
+                <div class="k-icon"><i class="fa-solid fa-square" style="transform: rotate(45deg);"></i></div>
+                <span class="k-text" id="texto-B">Opção B</span>
+                <span class="k-votes" id="votosB">0</span>
+            </div>
+            <div class="k-card k-yellow" id="card-C">
+                <div class="k-icon"><i class="fa-solid fa-circle"></i></div>
+                <span class="k-text" id="texto-C">Opção C</span>
+                <span class="k-votes" id="votosC">0</span>
+            </div>
+            <div class="k-card k-green" id="card-D">
+                <div class="k-icon"><i class="fa-solid fa-square"></i></div>
+                <span class="k-text" id="texto-D">Opção D</span>
+                <span class="k-votes" id="votosD">0</span>
+            </div>
+        </div>
+
+        <!-- Controles da Sala (Lobby) -->
+        <div id="controle-inicio" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(0,0,0,0.1); display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap;">
+            <label style="color: white; font-size: 1.2rem; font-weight: bold; margin-right: 15px;">
+                Limite de Participantes: 
+                <input type="number" id="limite-participantes" value="60" min="1" max="1000" onchange="atualizarLimite(this.value)" style="width: 80px; padding: 5px; border-radius: 5px; border: none; font-size: 1.2rem; text-align: center; color: #333; outline: none;">
+            </label>
+            <button class="btn-next" style="margin-top: 0; background: #FF9800; color: white;" onclick="iniciarQuiz()"><i class="fa-solid fa-play"></i> Iniciar Quiz</button>
+        </div>
+
+        <!-- Controles de Pergunta (Escondidos antes de iniciar) -->
+        <div id="controle-jogo" style="display: none; margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(0,0,0,0.1); justify-content: center; flex-wrap: wrap; gap: 10px;">
+            <button class="btn-next" style="margin-top: 0; background: #2196F3; color: white;" onclick="mudarPergunta()"><i class="fa-solid fa-pen"></i> Próxima Pergunta</button>
+            <button class="btn-next" style="margin-top: 0; background: #4CAF50; color: white;" onclick="avaliarResposta('A')">Acerto: A</button>
+            <button class="btn-next" style="margin-top: 0; background: #4CAF50; color: white;" onclick="avaliarResposta('B')">Acerto: B</button>
+            <button class="btn-next" style="margin-top: 0; background: #4CAF50; color: white;" onclick="avaliarResposta('C')">Acerto: C</button>
+            <button class="btn-next" style="margin-top: 0; background: #4CAF50; color: white;" onclick="avaliarResposta('D')">Acerto: D</button>
+            <button class="btn-next" style="margin-top: 0; background: #E53935; color: white;" onclick="encerrarJogo()"><i class="fa-solid fa-trophy"></i> Pódio</button>
+            <button class="btn-next" style="margin-top: 0; background: #9C27B0; color: white;" onclick="reiniciarJogo()"><i class="fa-solid fa-rotate-right"></i> Reiniciar Jogo</button>
+        </div>
+    </div>
+
+    <!-- Tela de Pódio do Telão -->
+    <div class="admin-container" id="podium-container" style="display: none; text-align: center;">
+        <h2 style="font-size: 3.5rem; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">🏆 Pódio Final 🏆</h2>
+        <div class="podium-places" id="podium-places"></div>
+        <button class="btn-next" style="margin-top: 50px; background: #9C27B0; color: white; padding: 15px 40px; font-size: 1.5rem;" onclick="reiniciarJogo()"><i class="fa-solid fa-rotate-right"></i> Jogar Novamente</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+        const socket = io();
+        
+        // Assim que o telão conecta com o servidor, ele exige o PIN atualizado
+        socket.on('connect', () => {
+            document.getElementById('sala-pin').innerText = "CONECTANDO...";
+            document.getElementById('sala-pin').style.color = "#FFD700"; // Fica amarelo enquanto pensa
+            socket.emit('pedir-pin');
+        });
+
+        // Se o servidor cair ou desligar, avisa na tela
+        socket.on('disconnect', () => {
+            document.getElementById('sala-pin').innerText = "OFFLINE";
+            document.getElementById('sala-pin').style.color = "#FF3333"; // Fica vermelho se perder a conexão
+        });
+
+        // Puxa o número do PIN gerado pelo backend
+        socket.on('estado-sala', (dados) => {
+            if (dados && dados.pin) {
+                document.getElementById('sala-pin').innerText = dados.pin;
+                document.getElementById('sala-pin').style.color = "#ffffff"; // Fica branco quando dá certo
+                
+                // Gera o QR Code com o link direto para o jogo
+                const qrContainer = document.getElementById('qrcode');
+                qrContainer.innerHTML = ''; // Limpa a imagem anterior caso o PIN atualize
+                const joinUrl = `${window.location.origin}/?pin=${dados.pin}`;
+                
+                new QRCode(qrContainer, {
+                    text: joinUrl,
+                    width: 160,
+                    height: 160,
+                    colorDark : "#000000",
+                    colorLight : "#ffffff"
+                });
+            }
+        });
+        
+        // Atualiza a tela de Cronômetro
+        socket.on('atualizar-timer', (tempo) => {
+            const timerEl = document.getElementById('timer-display');
+            if (tempo > 0) {
+                timerEl.style.display = 'flex';
+                timerEl.innerText = tempo;
+                if (tempo <= 5) timerEl.classList.add('timer-warning');
+                else timerEl.classList.remove('timer-warning');
+            } else {
+                timerEl.innerText = "0";
+            }
+        });
+
+        socket.on('tempo-esgotado', () => {
+            document.getElementById('timer-display').innerText = "0";
+            document.getElementById('dica-admin').innerText = "⏰ TEMPO ESGOTADO! Avalie a resposta.";
+        });
+
+        socket.on('atualizar-pergunta', (dados) => {
+            document.getElementById('pergunta').innerText = dados.pergunta;
+            if (dados.opcoes) {
+                // Só exibe a grade de respostas se a opção A não for o traço do Lobby "-"
+                if (dados.opcoes.A !== "-") {
+                    document.getElementById('opcoes-grid').style.display = 'grid';
+                    document.getElementById('controle-inicio').style.display = 'none';
+                    document.getElementById('controle-jogo').style.display = 'flex';
+                } else {
+                    document.getElementById('opcoes-grid').style.display = 'none';
+                }
+                document.getElementById('texto-A').innerText = dados.opcoes.A;
+                document.getElementById('texto-B').innerText = dados.opcoes.B;
+                document.getElementById('texto-C').innerText = dados.opcoes.C;
+                document.getElementById('texto-D').innerText = dados.opcoes.D;
+            }
+            atualizarTelaVotos(dados.votos);
+            
+            // Remove os efeitos de certo/errado ao pular de pergunta
+            document.querySelectorAll('.k-card').forEach(card => {
+                card.classList.remove('correct-answer', 'wrong-answer');
+            });
+        });
+
+        // Atualiza a lista lateral com quem está conectado e exibe a pontuação
+        socket.on('atualizar-usuarios', (usuarios) => {
+            const userList = document.getElementById('user-list');
+            document.getElementById('user-count').innerText = usuarios.length;
+            userList.innerHTML = '';
+            
+            // Ordena os usuários pela pontuação (do maior para o menor)
+            usuarios.sort((a, b) => b.pontos - a.pontos);
+            
+            usuarios.forEach((user, index) => {
+                const coroa = (index === 0 && user.pontos > 0) ? '👑 ' : '';
+                userList.innerHTML += `
+                    <div class="user-list-item">
+                        <img src="${user.avatar}" alt="${user.nome}">
+                        <span>${coroa}${user.nome} <br><small>${user.pontos} pts</small></span>
+                    </div>
+                `;
+            });
+        });
+
+        socket.on('atualizar-votos', (votos) => {
+            atualizarTelaVotos(votos);
+        });
+
+        function atualizarTelaVotos(votos) {
+            document.getElementById('votosA').innerText = votos.A;
+            document.getElementById('votosB').innerText = votos.B;
+            document.getElementById('votosC').innerText = votos.C;
+            document.getElementById('votosD').innerText = votos.D;
+        }
+
+        let indicePergunta = 0;
+        const quizPld = [
+            { pergunta: "1. Em que ano o COAF (Conselho de Controle de Ativ. Financeiras) foi criado?", opcoes: { A: "1988", B: "1994", C: "1998", D: "2002" }, correta: "C" },
+            { pergunta: "2. O que significa a sigla PLD?", opcoes: { A: "Planejamento de Lucro Direto", B: "Prevenção à Lavagem de Dinheiro", C: "Processo de Liberação de Documentos", D: "Pagamento de Lucro Diário" }, correta: "B" },
+            { pergunta: "3. No contexto de crimes financeiros, o que significa a sigla FTP?", opcoes: { A: "Financ. do Terrorismo e Proliferação", B: "Fundo de Transação Privada", C: "Fiscalização de Títulos Públicos", D: "Protocolo de Transferência de Arquivos" }, correta: "A" },
+            { pergunta: "4. Quantas fases clássicas existem no processo de Lavagem de Dinheiro?", opcoes: { A: "Uma fase", B: "Duas fases", C: "Três fases", D: "Quatro fases" }, correta: "C" },
+            { pergunta: "5. Qual é a 1ª fase da lavagem, onde o recurso entra no sistema?", opcoes: { A: "Ocultação", B: "Integração", C: "Colocação", D: "Devolução" }, correta: "C" },
+            { pergunta: "6. Qual é a 2ª fase, que serve para esconder a origem do dinheiro?", opcoes: { A: "Colocação", B: "Ocultação", C: "Integração", D: "Investimento" }, correta: "B" },
+            { pergunta: "7. Qual é a 3ª e última fase, onde o dinheiro volta com aparência legal?", opcoes: { A: "Colocação", B: "Ocultação", C: "Integração", D: "Divisão" }, correta: "C" },
+            { pergunta: "8. Qual é o principal objetivo do crime de Lavagem de Dinheiro?", opcoes: { A: "Evitar o pagamento de tarifas bancárias", B: "Dar aparência lícita a dinheiro ilícito", C: "Guardar dinheiro em espécie em casa", D: "Aumentar o limite do cartão de crédito" }, correta: "B" },
+            { pergunta: "9. Para qual órgão federal comunicamos operações suspeitas no Brasil?", opcoes: { A: "Receita Federal", B: "COAF", C: "Polícia Civil", D: "Procon" }, correta: "B" },
+            { pergunta: "10. A instituição pode avisar o cliente de que ele foi reportado ao COAF?", opcoes: { A: "Sim, para ele se explicar", B: "Não, o sigilo é obrigatório por lei", C: "Apenas se o cliente perguntar", D: "Sim, mas somente após 24 horas" }, correta: "B" },
+            { pergunta: "11. O que significa a política de 'Conheça seu Cliente' (KYC)?", opcoes: { A: "Memorizar os nomes dos clientes", B: "Verificar a compatibilidade de renda", C: "Emprestar para qualquer pessoa", D: "Dar brindes aos clientes antigos" }, correta: "B" },
+            { pergunta: "12. O que significa a sigla PEP na prevenção a crimes financeiros?", opcoes: { A: "Pessoa com Estabilidade Patrimonial", B: "Pessoa Politicamente Exposta", C: "Projeto de Economia Privada", D: "Plano de Empréstimo Pessoal" }, correta: "B" },
+            { pergunta: "13. Quem é classificada como uma Pessoa Politicamente Exposta (PEP)?", opcoes: { A: "Celebridades e artistas da TV", B: "Quem ocupa/ocupou cargo público", C: "Qualquer funcionário de empresa", D: "Pessoas que viajam muito ao exterior" }, correta: "B" },
+            { pergunta: "14. No Financ. do Terrorismo (FTP), o dinheiro pode ter origem legal?", opcoes: { A: "Sim, pode ter origem lícita ou ilícita", B: "Não, tem que vir sempre de roubos", C: "Não, o terrorismo só usa moeda falsa", D: "Sim, mas apenas se for em espécie" }, correta: "A" },
+            { pergunta: "15. O que caracteriza uma operação 'atípica' no monitoramento?", opcoes: { A: "Movimentação que foge do padrão/perfil", B: "Pagar conta de água no caixa", C: "Transação feita no horário de almoço", D: "Depósito de baixo valor na poupança" }, correta: "A" }
+        ];
+
+        // Envia o novo limite em tempo real caso o apresentador edite a caixa de número antes de iniciar
+        function atualizarLimite(valor) {
+            const novoLimite = parseInt(valor);
+            if (novoLimite > 0) socket.emit('atualizar-limite', novoLimite);
+        }
+
+        // Disparado quando o admin decide fechar a sala para novas entradas e começar
+        function iniciarQuiz() {
+            const limite = document.getElementById('limite-participantes').value;
+            if (confirm(`Deseja trancar a sala com o limite de ${limite} jogadores e iniciar o jogo?`)) {
+                socket.emit('iniciar-jogo', { limite: parseInt(limite) || 60 });
+                document.getElementById('controle-inicio').style.display = 'none'; // Some botões de lobby
+                document.getElementById('qr-section').style.display = 'none'; // Esconde o QR Code para o jogo começar limpo
+                document.getElementById('controle-jogo').style.display = 'flex'; // Aparece botões do jogo
+                mudarPergunta(); // Envia a PRIMEIRA pergunta automaticamente!
+            }
+        }
+
+        function mudarPergunta() {
+            if (indicePergunta < quizPld.length) {
+                const q = quizPld[indicePergunta];
+                socket.emit('proxima-pergunta', {
+                    pergunta: q.pergunta,
+                    opcoes: q.opcoes
+                });
+                
+                document.getElementById('dica-admin').innerText = `👉 A RESPOSTA CORRETA DESTA É A LETRA: ${q.correta}`;
+                indicePergunta++;
+            } else {
+                alert("Todas as perguntas acabaram! Avalie a última resposta e clique em Pódio.");
+                document.getElementById('dica-admin').innerText = "Fim do Quiz!";
+            }
+        }
+
+        // Envia a avaliação para o servidor
+        function avaliarResposta(opcaoCorreta) {
+            socket.emit('avaliar-pergunta', opcaoCorreta);
+        }
+        
+        function encerrarJogo() {
+            if(confirm("Deseja encerrar o jogo e mostrar o Pódio?")) socket.emit('encerrar-jogo');
+        }
+
+        function reiniciarJogo() {
+            if(confirm("Tem certeza que deseja apagar todos os jogadores, zerar os pontos e gerar um novo PIN?")) {
+                socket.emit('reiniciar-jogo');
+            }
+        }
+
+        // Escuta o evento para animar o telão
+        socket.on('mostrar-resposta-correta', (opcaoCorreta) => {
+            const opcoes = ['A', 'B', 'C', 'D'];
+            opcoes.forEach(opcao => {
+                const card = document.getElementById('card-' + opcao);
+                if (card) {
+                    if (opcao === opcaoCorreta) {
+                        card.classList.add('correct-answer');
+                    } else {
+                        card.classList.add('wrong-answer');
+                    }
+                }
+            });
+        });
+
+        // Exibe o Pódio Animado no Telão
+        socket.on('exibir-podio', (rankingCompleto) => {
+            document.getElementById('question-container').style.display = 'none'; // Esconde as perguntas
+            document.getElementById('podium-container').style.display = 'block'; // Mostra o pódio
+            
+            const audioAplausos = new Audio('https://actions.google.com/sounds/v1/crowds/light_applause.ogg');
+            audioAplausos.play().catch(err => console.log(err));
+
+            setTimeout(() => {
+                const duracaoConfete = 5 * 1000;
+                const fimAnimacao = Date.now() + duracaoConfete;
+                const coresPodio = ['#FFD700', '#C0C0C0', '#CD7F32'];
+
+                (function dispararConfetes() {
+                    confetti({ particleCount: 8, angle: 60, spread: 55, origin: { x: 0 }, colors: coresPodio, zIndex: 1000 });
+                    confetti({ particleCount: 8, angle: 120, spread: 55, origin: { x: 1 }, colors: coresPodio, zIndex: 1000 });
+                    if (Date.now() < fimAnimacao) requestAnimationFrame(dispararConfetes);
+                }());
+            }, 2500); // Aguarda a animação da barra do 1º lugar subir para estourar
+
+            const podiumPlaces = document.getElementById('podium-places');
+            podiumPlaces.innerHTML = '';
+            const rankingPodio = rankingCompleto.slice(0, 3);
+            const visualOrder = [1, 0, 2];
+            
+            visualOrder.forEach(idx => {
+                if (rankingPodio[idx]) {
+                    const user = rankingPodio[idx];
+                    const positionClass = idx === 0 ? 'first' : (idx === 1 ? 'second' : 'third');
+                    const crownHtml = idx === 0 ? '<i class="fa-solid fa-crown crown-icon"></i>' : '';
+                    podiumPlaces.innerHTML += `
+                        <div class="podium-place ${positionClass}">
+                            ${crownHtml}
+                            <img src="${user.avatar}" alt="${user.nome}">
+                            <div class="podium-bar"><span>${idx + 1}º</span><span style="font-size:0.7rem">${user.pontos} pts</span></div>
+                            <span class="podium-name" style="color: white; font-size: 1.2rem;">${user.nome}</span>
+                        </div>
+                    `;
+                }
+            });
+        });
+
+        // Quando o servidor reinicia o jogo, recarrega a página do Admin para atualizar o PIN na tela
+        socket.on('jogo-reiniciado', () => {
+            location.reload();
+        });
+    </script>
+</body>
+</html>

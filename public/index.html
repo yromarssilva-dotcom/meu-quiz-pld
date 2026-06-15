@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz PLD-FTP</title>
+    <!-- Fonte moderna e limpa -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
+    <!-- Biblioteca de ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="mobile-body">
+    <!-- Container de Notificações (Animações de entrada) -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Tela de Login -->
+    <div class="mobile-fullscreen" id="login-container">
+        <div class="mobile-glass-panel">
+            <img src="PLD-FTP.png" alt="Logo Quiz PLD-FTP" class="quiz-logo">
+            <input type="number" id="pin-input" class="kahoot-input" placeholder="PIN da Sala" autocomplete="off" maxlength="4">
+            <input type="text" id="username-input" class="kahoot-input" placeholder="Seu Apelido" autocomplete="off" maxlength="15">
+            <button class="kahoot-btn" onclick="entrarJogo()">Entrar no Jogo</button>
+        </div>
+    </div>
+
+    <!-- Tela do Jogo (Escondida inicialmente) -->
+    <div class="mobile-fullscreen" id="quiz-container" style="display: none; padding: 15px;">
+        <div id="status-message" class="mobile-top-status">Você entrou! Prepare-se...</div>
+        <div class="mobile-user-profile" id="user-profile">
+            <img id="my-avatar" src="" alt="Meu Avatar">
+            <span id="my-name">Apelido</span>
+        </div>
+        <h1 id="question-text" style="display: none;"></h1> <!-- Mantido oculto pro JS não quebrar -->
+        <div id="timer-display" class="timer-display" style="display: none; width: 60px; height: 60px; font-size: 1.8rem; border-width: 3px;">--</div>
+        <div class="mobile-button-grid">
+            <button class="k-btn k-red" onclick="votar('A')" id="btn-A"><i class="fa-solid fa-play fa-rotate-270"></i></button>
+            <button class="k-btn k-blue" onclick="votar('B')" id="btn-B"><i class="fa-solid fa-square" style="transform: rotate(45deg);"></i></button>
+            <button class="k-btn k-yellow" onclick="votar('C')" id="btn-C"><i class="fa-solid fa-circle"></i></button>
+            <button class="k-btn k-green" onclick="votar('D')" id="btn-D"><i class="fa-solid fa-square"></i></button>
+        </div>
+    </div>
+
+    <!-- Tela de Pódio (Escondida inicialmente) -->
+    <div class="mobile-fullscreen" id="podium-container" style="display: none;">
+        <div class="mobile-glass-panel" style="width: 95%;">
+            <h2 style="font-size: 2.2rem; margin-bottom: 20px;">🏆 Fim de Jogo! 🏆</h2>
+            <div id="personal-result" style="color: white; font-size: 1.2rem; margin-bottom: 20px; font-weight: bold; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.2);"></div>
+            <div class="podium-places" id="podium-places"></div>
+            <button class="kahoot-btn" onclick="location.reload()" style="margin-top: 30px;">Sair</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
