@@ -18,7 +18,7 @@
     <div class="admin-container" id="qr-container" style="display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 90vh;">
         <h1 style="font-size: 3.5rem; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">Escaneie para Participar!</h1>
         <div id="qrcode" style="padding: 25px; background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);"></div>
-        <button class="btn-next" style="margin-top: 50px; background: #2196F3; color: white; font-size: 1.5rem; padding: 20px 50px; border-radius: 50px;" onclick="irParaLobby()">Mostrar PIN e Lobby <i class="fa-solid fa-arrow-right"></i></button>
+        <button class="btn-next" style="margin-top: 50px; background: #2196F3; color: white; font-size: 1.5rem; padding: 20px 50px; border-radius: 50px;" onclick="irParaLobby()">Ir para o Lobby (Mostrar PIN) <i class="fa-solid fa-arrow-right"></i></button>
     </div>
 
     <!-- Tela do Jogo / Lobby -->
@@ -26,11 +26,11 @@
         <div class="pin-display" style="margin-bottom: 10px;">
             PIN do Jogo: <span id="sala-pin" style="letter-spacing: 4px;">----</span>
         </div>
-        <p style="color: #FFD700; font-size: 1.2rem; font-weight: bold; margin-bottom: 30px; text-shadow: 1px 1px 2px #000;">Aguardando os jogadores...</p>
+        <p id="lobby-text" style="color: #FFD700; font-size: 1.2rem; font-weight: bold; margin-bottom: 30px; text-shadow: 1px 1px 2px #000;">Aguardando os jogadores...</p>
 
         <div id="timer-display" class="timer-display" style="display: none;">--</div>
         
-        <h1 id="pergunta" class="kahoot-question">Aguardando...</h1>
+        <h1 id="pergunta" class="kahoot-question" style="display: none;">Aguardando...</h1>
         <div id="dica-admin" style="color: #FFD700; font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; text-shadow: 1px 1px 2px #000;"></div>
         
         <!-- Esconde a grade de alternativas até que o jogo comece -->
@@ -144,10 +144,14 @@
             if (dados.opcoes) {
                 // Só exibe a grade de respostas se a opção A não for o traço do Lobby "-"
                 if (dados.opcoes.A !== "-") {
+                    document.getElementById('pergunta').style.display = 'block'; // Mostra a pergunta
+                    document.getElementById('lobby-text').style.display = 'none'; // Esconde o "Aguardando..."
                     document.getElementById('opcoes-grid').style.display = 'grid';
                     document.getElementById('controle-inicio').style.display = 'none';
                     document.getElementById('controle-jogo').style.display = 'flex';
                 } else {
+                    document.getElementById('pergunta').style.display = 'none'; // Esconde a pergunta no Lobby
+                    document.getElementById('lobby-text').style.display = 'block'; // Mostra o "Aguardando..."
                     document.getElementById('opcoes-grid').style.display = 'none';
                 }
                 document.getElementById('texto-A').innerText = dados.opcoes.A;
@@ -307,8 +311,14 @@
             document.getElementById('admin-body').style.paddingRight = '0'; // Centraliza o pódio
             document.getElementById('podium-container').style.display = 'block'; // Mostra o pódio
             
-            const audioAplausos = new Audio('https://actions.google.com/sounds/v1/crowds/light_applause.ogg');
-            audioAplausos.play().catch(err => console.log(err));
+            // Toca os tambores de suspense
+            const audioTambores = new Audio('https://www.myinstants.com/media/sounds/drum-roll-sound-effect.mp3');
+            audioTambores.play().catch(err => console.log(err));
+
+            setTimeout(() => {
+                const audioAplausos = new Audio('https://actions.google.com/sounds/v1/crowds/light_applause.ogg');
+                audioAplausos.play().catch(err => console.log(err));
+            }, 2500); // Aplausos só entram quando o 1º lugar for revelado!
 
             setTimeout(() => {
                 const duracaoConfete = 5 * 1000;
