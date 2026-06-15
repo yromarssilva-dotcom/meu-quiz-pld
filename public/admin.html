@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <title>Painel do Apresentador</title>
+    <title>PopQuiz - Painel do Apresentador</title>
     <script src="/socket.io/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body style="padding-right: 0;" id="admin-body"> <!-- Espaço inicial zero, depois aumenta pro sidebar -->
+    <!-- Container de Pop-ups de Entrada -->
+    <div id="admin-toast-container" class="admin-toast-container"></div>
+
     <!-- Barra Lateral de Jogadores -->
     <aside class="admin-sidebar" id="admin-sidebar" style="display: none;">
         <h3>Jogadores (<span id="user-count">0</span>)</h3>
@@ -63,6 +66,7 @@
                 Limite de Participantes: 
                 <input type="number" id="limite-participantes" value="60" min="1" max="1000" onchange="atualizarLimite(this.value)" style="width: 80px; padding: 5px; border-radius: 5px; border: none; font-size: 1.2rem; text-align: center; color: #333; outline: none;">
             </label>
+            <button class="btn-next" style="margin-top: 0; background: #673AB7; color: white;" onclick="abrirGerenciadorPerguntas()"><i class="fa-solid fa-gear"></i> Gerenciar Perguntas</button>
             <button class="btn-next" style="margin-top: 0; background: #FF9800; color: white;" onclick="iniciarQuiz()"><i class="fa-solid fa-play"></i> Iniciar Quiz</button>
         </div>
 
@@ -80,6 +84,35 @@
         <h2 style="font-size: 3.5rem; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">🏆 Pódio Final 🏆</h2>
         <div class="podium-places" id="podium-places"></div>
         <button class="btn-next" style="margin-top: 50px; background: #9C27B0; color: white; padding: 15px 40px; font-size: 1.5rem;" onclick="reiniciarJogo()"><i class="fa-solid fa-rotate-right"></i> Jogar Novamente</button>
+    </div>
+
+    <!-- Modal de Gerenciamento de Perguntas -->
+    <div id="modal-perguntas" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="fecharGerenciador()">&times;</span>
+            <h2 style="margin-bottom: 20px;"><i class="fa-solid fa-list-check"></i> Gerenciar Perguntas</h2>
+            
+            <div id="lista-perguntas" style="max-height: 250px; overflow-y: auto; margin-bottom: 20px; padding-right: 10px;">
+                <!-- Perguntas injetadas via JS -->
+            </div>
+
+            <div style="background: #f4f4f4; padding: 20px; border-radius: 10px; border: 1px solid #ddd;">
+                <h3 style="margin-bottom: 15px; font-size: 1.1rem;">Adicionar Nova Pergunta</h3>
+                <input type="text" id="nova-pergunta-texto" class="form-input" placeholder="Ex: Qual é a cor do cavalo branco de Napoleão?">
+                <div class="grid-opcoes">
+                    <input type="text" id="nova-opcao-a" class="form-input" placeholder="Opção A" style="margin-bottom:0;">
+                    <input type="text" id="nova-opcao-b" class="form-input" placeholder="Opção B" style="margin-bottom:0;">
+                    <input type="text" id="nova-opcao-c" class="form-input" placeholder="Opção C" style="margin-bottom:0;">
+                    <input type="text" id="nova-opcao-d" class="form-input" placeholder="Opção D" style="margin-bottom:0;">
+                </div>
+                <label style="font-weight: bold; margin-right: 10px;">Opção Correta:</label>
+                <select id="nova-correta" class="form-input" style="width: auto; display: inline-block;">
+                    <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option>
+                </select>
+                <button onclick="adicionarPergunta()" style="background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-left: 10px;"><i class="fa-solid fa-plus"></i> Adicionar à Lista</button>
+            </div>
+            <button onclick="salvarPerguntasNoServidor()" style="margin-top: 20px; background: #2196F3; color: white; padding: 15px 30px; font-size: 1.2rem; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fa-solid fa-floppy-disk"></i> Salvar no Servidor</button>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
@@ -192,6 +225,19 @@
             const audioJoin = new Audio('https://actions.google.com/sounds/v1/cartoon/pop.ogg');
             audioJoin.volume = 0.6; // Ajusta o volume para não assustar
             audioJoin.play().catch(err => console.log("Áudio bloqueado:", err));
+            
+            // Cria o Pop-up na tela do telão
+            const container = document.getElementById('admin-toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'admin-toast';
+            toast.innerHTML = `<img src="${usuario.avatar}" alt="${usuario.nome}"> <span>${usuario.nome} entrou!</span>`;
+            container.appendChild(toast);
+            
+            // Deixa por 1 segundo, aplica o fade out e remove
+            setTimeout(() => {
+                toast.classList.add('fade-out');
+                setTimeout(() => toast.remove(), 400); // Remove o elemento do HTML após o fade
+            }, 1000);
         });
 
         socket.on('atualizar-votos', (votos) => {
@@ -207,23 +253,15 @@
 
         let indicePergunta = 0;
         let respostaCorretaAtual = "";
-        const quizPld = [
-            { pergunta: "1. Em que ano o COAF (Conselho de Controle de Ativ. Financeiras) foi criado?", opcoes: { A: "1988", B: "1994", C: "1998", D: "2002" }, correta: "C" },
-            { pergunta: "2. O que significa a sigla PLD?", opcoes: { A: "Planejamento de Lucro Direto", B: "Prevenção à Lavagem de Dinheiro", C: "Processo de Liberação de Documentos", D: "Pagamento de Lucro Diário" }, correta: "B" },
-            { pergunta: "3. No contexto de crimes financeiros, o que significa a sigla FTP?", opcoes: { A: "Financ. do Terrorismo e Proliferação", B: "Fundo de Transação Privada", C: "Fiscalização de Títulos Públicos", D: "Protocolo de Transferência de Arquivos" }, correta: "A" },
-            { pergunta: "4. Quantas fases clássicas existem no processo de Lavagem de Dinheiro?", opcoes: { A: "Uma fase", B: "Duas fases", C: "Três fases", D: "Quatro fases" }, correta: "C" },
-            { pergunta: "5. Qual é a 1ª fase da lavagem, onde o recurso entra no sistema?", opcoes: { A: "Ocultação", B: "Integração", C: "Colocação", D: "Devolução" }, correta: "C" },
-            { pergunta: "6. Qual é a 2ª fase, que serve para esconder a origem do dinheiro?", opcoes: { A: "Colocação", B: "Ocultação", C: "Integração", D: "Investimento" }, correta: "B" },
-            { pergunta: "7. Qual é a 3ª e última fase, onde o dinheiro volta com aparência legal?", opcoes: { A: "Colocação", B: "Ocultação", C: "Integração", D: "Divisão" }, correta: "C" },
-            { pergunta: "8. Qual é o principal objetivo do crime de Lavagem de Dinheiro?", opcoes: { A: "Evitar o pagamento de tarifas bancárias", B: "Dar aparência lícita a dinheiro ilícito", C: "Guardar dinheiro em espécie em casa", D: "Aumentar o limite do cartão de crédito" }, correta: "B" },
-            { pergunta: "9. Para qual órgão federal comunicamos operações suspeitas no Brasil?", opcoes: { A: "Receita Federal", B: "COAF", C: "Polícia Civil", D: "Procon" }, correta: "B" },
-            { pergunta: "10. A instituição pode avisar o cliente de que ele foi reportado ao COAF?", opcoes: { A: "Sim, para ele se explicar", B: "Não, o sigilo é obrigatório por lei", C: "Apenas se o cliente perguntar", D: "Sim, mas somente após 24 horas" }, correta: "B" },
-            { pergunta: "11. O que significa a política de 'Conheça seu Cliente' (KYC)?", opcoes: { A: "Memorizar os nomes dos clientes", B: "Verificar a compatibilidade de renda", C: "Emprestar para qualquer pessoa", D: "Dar brindes aos clientes antigos" }, correta: "B" },
-            { pergunta: "12. O que significa a sigla PEP na prevenção a crimes financeiros?", opcoes: { A: "Pessoa com Estabilidade Patrimonial", B: "Pessoa Politicamente Exposta", C: "Projeto de Economia Privada", D: "Plano de Empréstimo Pessoal" }, correta: "B" },
-            { pergunta: "13. Quem é classificada como uma Pessoa Politicamente Exposta (PEP)?", opcoes: { A: "Celebridades e artistas da TV", B: "Quem ocupa/ocupou cargo público", C: "Qualquer funcionário de empresa", D: "Pessoas que viajam muito ao exterior" }, correta: "B" },
-            { pergunta: "14. No Financ. do Terrorismo (FTP), o dinheiro pode ter origem legal?", opcoes: { A: "Sim, pode ter origem lícita ou ilícita", B: "Não, tem que vir sempre de roubos", C: "Não, o terrorismo só usa moeda falsa", D: "Sim, mas apenas se for em espécie" }, correta: "A" },
-            { pergunta: "15. O que caracteriza uma operação 'atípica' no monitoramento?", opcoes: { A: "Movimentação que foge do padrão/perfil", B: "Pagar conta de água no caixa", C: "Transação feita no horário de almoço", D: "Depósito de baixo valor na poupança" }, correta: "A" }
-        ];
+        let quizPld = [];
+
+        // Carrega as perguntas do arquivo JSON
+        fetch('questions.json')
+            .then(response => response.json())
+            .then(data => {
+                quizPld = data;
+            })
+            .catch(error => console.error("Erro ao carregar as perguntas:", error));
 
         // Envia o novo limite em tempo real caso o apresentador edite a caixa de número antes de iniciar
         function atualizarLimite(valor) {
@@ -358,6 +396,67 @@
         socket.on('jogo-reiniciado', () => {
             location.reload();
         });
+
+        // --- SISTEMA DE GERENCIAMENTO DE PERGUNTAS ---
+        function abrirGerenciadorPerguntas() {
+            document.getElementById('modal-perguntas').style.display = 'block';
+            renderizarListaPerguntas();
+        }
+
+        function fecharGerenciador() {
+            document.getElementById('modal-perguntas').style.display = 'none';
+        }
+
+        function renderizarListaPerguntas() {
+            const lista = document.getElementById('lista-perguntas');
+            lista.innerHTML = '';
+            quizPld.forEach((q, index) => {
+                lista.innerHTML += `
+                    <div class="pergunta-item">
+                        <div style="flex-grow: 1;">
+                            <strong>${index + 1}. ${q.pergunta.replace(/^\d+\.\s*/, '')}</strong><br>
+                            <small>A) ${q.opcoes.A} | B) ${q.opcoes.B} | C) ${q.opcoes.C} | D) ${q.opcoes.D} <strong style="color:#4CAF50;">(Correta: ${q.correta})</strong></small>
+                        </div>
+                        <button class="btn-remover" onclick="removerPergunta(${index})" title="Excluir"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                `;
+            });
+        }
+
+        function adicionarPergunta() {
+            const texto = document.getElementById('nova-pergunta-texto').value;
+            const a = document.getElementById('nova-opcao-a').value;
+            const b = document.getElementById('nova-opcao-b').value;
+            const c = document.getElementById('nova-opcao-c').value;
+            const d = document.getElementById('nova-opcao-d').value;
+            const correta = document.getElementById('nova-correta').value;
+
+            if (!texto || !a || !b || !c || !d) return alert('Preencha todos os campos da pergunta!');
+
+            quizPld.push({ pergunta: `${quizPld.length + 1}. ${texto}`, opcoes: { A: a, B: b, C: c, D: d }, correta: correta });
+
+            document.getElementById('nova-pergunta-texto').value = '';
+            document.getElementById('nova-opcao-a').value = '';
+            document.getElementById('nova-opcao-b').value = '';
+            document.getElementById('nova-opcao-c').value = '';
+            document.getElementById('nova-opcao-d').value = '';
+            renderizarListaPerguntas();
+        }
+
+        function removerPergunta(index) {
+            if (confirm("Tem certeza que deseja remover esta pergunta?")) {
+                quizPld.splice(index, 1);
+                quizPld = quizPld.map((q, i) => { q.pergunta = `${i + 1}. ${q.pergunta.replace(/^\d+\.\s*/, '')}`; return q; });
+                renderizarListaPerguntas();
+            }
+        }
+
+        function salvarPerguntasNoServidor() {
+            socket.emit('salvar-perguntas', quizPld);
+        }
+
+        socket.on('perguntas-salvas', () => { alert('Perguntas salvas com sucesso!'); fecharGerenciador(); });
+        socket.on('perguntas-erro', (err) => { alert('Erro ao salvar perguntas: ' + err); });
     </script>
 </body>
 </html>
