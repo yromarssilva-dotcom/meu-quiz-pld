@@ -68,10 +68,7 @@
 
         <!-- Controles de Pergunta (Escondidos antes de iniciar) -->
         <div id="controle-jogo" style="display: none; margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(0,0,0,0.1); justify-content: center; flex-wrap: wrap; gap: 10px;">
-            <button class="btn-next" style="margin-top: 0; background: #4CAF50; color: white;" onclick="avaliarResposta('A')"><i class="fa-solid fa-eye"></i> Revelar: A</button>
-            <button class="btn-next" style="margin-top: 0; background: #4CAF50; color: white;" onclick="avaliarResposta('B')"><i class="fa-solid fa-eye"></i> Revelar: B</button>
-            <button class="btn-next" style="margin-top: 0; background: #4CAF50; color: white;" onclick="avaliarResposta('C')"><i class="fa-solid fa-eye"></i> Revelar: C</button>
-            <button class="btn-next" style="margin-top: 0; background: #4CAF50; color: white;" onclick="avaliarResposta('D')"><i class="fa-solid fa-eye"></i> Revelar: D</button>
+            <button class="btn-next" style="margin-top: 0; background: #4CAF50; color: white;" onclick="avaliarResposta()"><i class="fa-solid fa-eye"></i> Revelar Resposta</button>
             <button class="btn-next" style="margin-top: 0; background: #2196F3; color: white;" onclick="mudarPergunta()"><i class="fa-solid fa-arrow-right"></i> Próxima Pergunta</button>
             <button class="btn-next" style="margin-top: 0; background: #E53935; color: white;" onclick="encerrarJogo()"><i class="fa-solid fa-flag-checkered"></i> Finalizar Quiz e Pódio</button>
             <button class="btn-next" style="margin-top: 0; background: #9C27B0; color: white;" onclick="reiniciarJogo()"><i class="fa-solid fa-rotate-right"></i> Reiniciar Jogo</button>
@@ -139,7 +136,7 @@
 
         socket.on('tempo-esgotado', () => {
             document.getElementById('timer-display').innerText = "0";
-            document.getElementById('dica-admin').innerText = "⏰ TEMPO ESGOTADO! Avalie a resposta.";
+            document.getElementById('dica-admin').innerText = "⏰ TEMPO ESGOTADO! Clique em Revelar Resposta.";
         });
 
         socket.on('atualizar-pergunta', (dados) => {
@@ -205,6 +202,7 @@
         }
 
         let indicePergunta = 0;
+        let respostaCorretaAtual = "";
         const quizPld = [
             { pergunta: "1. Em que ano o COAF (Conselho de Controle de Ativ. Financeiras) foi criado?", opcoes: { A: "1988", B: "1994", C: "1998", D: "2002" }, correta: "C" },
             { pergunta: "2. O que significa a sigla PLD?", opcoes: { A: "Planejamento de Lucro Direto", B: "Prevenção à Lavagem de Dinheiro", C: "Processo de Liberação de Documentos", D: "Pagamento de Lucro Diário" }, correta: "B" },
@@ -256,17 +254,20 @@
                     opcoes: q.opcoes
                 });
                 
-                document.getElementById('dica-admin').innerText = `👉 A RESPOSTA CORRETA DESTA É A LETRA: ${q.correta}`;
+                respostaCorretaAtual = q.correta; // Salva a resposta correta na memória
+                document.getElementById('dica-admin').innerText = ""; // Deixa a tela limpa sem spoiler!
                 indicePergunta++;
             } else {
-                alert("Todas as perguntas acabaram! Avalie a última resposta e clique em Pódio.");
+                alert("Todas as perguntas acabaram! Revele a última resposta e clique em Pódio.");
                 document.getElementById('dica-admin').innerText = "Fim do Quiz!";
             }
         }
 
         // Envia a avaliação para o servidor
-        function avaliarResposta(opcaoCorreta) {
-            socket.emit('avaliar-pergunta', opcaoCorreta);
+        function avaliarResposta() {
+            if (!respostaCorretaAtual) return;
+            socket.emit('avaliar-pergunta', respostaCorretaAtual);
+            document.getElementById('dica-admin').innerText = ""; // Limpa a mensagem de tempo esgotado
         }
         
         function encerrarJogo() {
