@@ -7,23 +7,26 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
-<body style="padding-right: 250px;"> <!-- Espaço para não esconder sob a barra -->
+<body style="padding-right: 0;" id="admin-body"> <!-- Espaço inicial zero, depois aumenta pro sidebar -->
     <!-- Barra Lateral de Jogadores -->
-    <aside class="admin-sidebar" id="admin-sidebar">
+    <aside class="admin-sidebar" id="admin-sidebar" style="display: none;">
         <h3>Jogadores (<span id="user-count">0</span>)</h3>
         <div id="user-list"></div>
     </aside>
 
-    <div class="admin-container" id="question-container">
-        <div class="pin-display">
+    <!-- Tela Inicial: QR Code Gigante -->
+    <div class="admin-container" id="qr-container" style="display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 90vh;">
+        <h1 style="font-size: 3.5rem; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">Escaneie para Participar!</h1>
+        <div id="qrcode" style="padding: 25px; background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);"></div>
+        <button class="btn-next" style="margin-top: 50px; background: #2196F3; color: white; font-size: 1.5rem; padding: 20px 50px; border-radius: 50px;" onclick="irParaLobby()">Mostrar PIN e Lobby <i class="fa-solid fa-arrow-right"></i></button>
+    </div>
+
+    <!-- Tela do Jogo / Lobby -->
+    <div class="admin-container" id="question-container" style="display: none;">
+        <div class="pin-display" style="margin-bottom: 10px;">
             PIN do Jogo: <span id="sala-pin" style="letter-spacing: 4px;">----</span>
         </div>
-        
-        <!-- QR Code Container -->
-        <div id="qr-section" style="display: flex; flex-direction: column; align-items: center; margin-bottom: 25px;">
-            <div id="qrcode" style="padding: 10px; background: white; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);"></div>
-            <p style="margin-top: 10px; font-size: 1.2rem; color: #FFD700; font-weight: bold; text-shadow: 1px 1px 2px #000;">Aponte a câmera para entrar!</p>
-        </div>
+        <p style="color: #FFD700; font-size: 1.2rem; font-weight: bold; margin-bottom: 30px; text-shadow: 1px 1px 2px #000;">Aguardando os jogadores...</p>
 
         <div id="timer-display" class="timer-display" style="display: none;">--</div>
         
@@ -113,8 +116,8 @@
                 
                 new QRCode(qrContainer, {
                     text: joinUrl,
-                    width: 160,
-                    height: 160,
+                    width: 450,
+                    height: 450,
                     colorDark : "#000000",
                     colorLight : "#ffffff"
                 });
@@ -183,6 +186,13 @@
             });
         });
 
+        // Escuta quando um novo usuário entra e toca o som de notificação (Pop)
+        socket.on('usuario-conectado', (usuario) => {
+            const audioJoin = new Audio('https://actions.google.com/sounds/v1/cartoon/pop.ogg');
+            audioJoin.volume = 0.6; // Ajusta o volume para não assustar
+            audioJoin.play().catch(err => console.log("Áudio bloqueado:", err));
+        });
+
         socket.on('atualizar-votos', (votos) => {
             atualizarTelaVotos(votos);
         });
@@ -219,13 +229,20 @@
             if (novoLimite > 0) socket.emit('atualizar-limite', novoLimite);
         }
 
+        // Avança da tela de QR Code para a tela de Lobby e revela o PIN
+        function irParaLobby() {
+            document.getElementById('qr-container').style.display = 'none';
+            document.getElementById('question-container').style.display = 'block';
+            document.getElementById('admin-sidebar').style.display = 'block';
+            document.getElementById('admin-body').style.paddingRight = '250px'; // Abre espaço para a barra lateral
+        }
+
         // Disparado quando o admin decide fechar a sala para novas entradas e começar
         function iniciarQuiz() {
             const limite = document.getElementById('limite-participantes').value;
             if (confirm(`Deseja trancar a sala com o limite de ${limite} jogadores e iniciar o jogo?`)) {
                 socket.emit('iniciar-jogo', { limite: parseInt(limite) || 60 });
                 document.getElementById('controle-inicio').style.display = 'none'; // Some botões de lobby
-                document.getElementById('qr-section').style.display = 'none'; // Esconde o QR Code para o jogo começar limpo
                 document.getElementById('controle-jogo').style.display = 'flex'; // Aparece botões do jogo
                 mudarPergunta(); // Envia a PRIMEIRA pergunta automaticamente!
             }
@@ -264,6 +281,11 @@
 
         // Escuta o evento para animar o telão
         socket.on('mostrar-resposta-correta', (opcaoCorreta) => {
+            // Toca o efeito sonoro de revelação da resposta
+            const audioReveal = new Audio('https://actions.google.com/sounds/v1/cartoon/magic_chime.ogg');
+            audioReveal.volume = 0.7;
+            audioReveal.play().catch(err => console.log("Áudio bloqueado:", err));
+
             const opcoes = ['A', 'B', 'C', 'D'];
             opcoes.forEach(opcao => {
                 const card = document.getElementById('card-' + opcao);
@@ -280,6 +302,8 @@
         // Exibe o Pódio Animado no Telão
         socket.on('exibir-podio', (rankingCompleto) => {
             document.getElementById('question-container').style.display = 'none'; // Esconde as perguntas
+            document.getElementById('admin-sidebar').style.display = 'none'; // Esconde a barra lateral
+            document.getElementById('admin-body').style.paddingRight = '0'; // Centraliza o pódio
             document.getElementById('podium-container').style.display = 'block'; // Mostra o pódio
             
             const audioAplausos = new Audio('https://actions.google.com/sounds/v1/crowds/light_applause.ogg');
